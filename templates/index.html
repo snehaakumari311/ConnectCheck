@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ConnectCheck - Network Diagnostics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="container">
+            <h1>ConnectCheck</h1>
+            <p>Network Diagnostics and Packet Analysis Tool</p>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <form method="POST" class="search-card" id="diagnose-form">
+            <label for="domain">Enter a domain to diagnose</label>
+
+            <div class="search-row">
+                <input
+                    type="text"
+                    id="domain"
+                    name="domain"
+                    placeholder="example.com"
+                    value="{{ domain_value }}"
+                    required
+                    autocomplete="off"
+                >
+
+                <button type="submit" id="submit-btn">Diagnose</button>
+            </div>
+
+            <small>Only test domains you are authorized to check.</small>
+        </form>
+
+        {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        {% if data %}
+
+            {% set dg = data.diagnosis %}
+
+            <section class="diagnosis sev-{{ dg.status }}">
+                <div class="diag-head">
+                    <h2>Diagnosis for {{ data.domain }}</h2>
+                    <span class="badge badge-{{ dg.status }}">
+                        {{ dg.status|upper }}
+                    </span>
+                </div>
+
+                <p><strong>Category:</strong> {{ dg.category }}</p>
+
+                <p class="cause">
+                    <strong>Probable cause:</strong>
+                    {{ dg.probable_cause }}
+                </p>
+
+                <p class="summary">{{ dg.summary }}</p>
+
+                <div class="diag-cols">
+                    <div>
+                        <h3>Findings</h3>
+                        <ul>
+                            {% for finding in dg.findings %}
+                                <li>{{ finding }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3>Recommendations</h3>
+                        <ul>
+                            {% for recommendation in dg.recommendations %}
+                                <li>{{ recommendation }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid">
+
+                {% for c in data.checks %}
+
+                    <article class="card {{ 'pass' if c.success else 'fail' }}">
+
+                        <div class="card-head">
+                            <h3>{{ c.check }}</h3>
+
+                            <span class="status">
+                                {{ 'PASS' if c.success else 'FAIL' }}
+                            </span>
+                        </div>
+
+                        <p class="msg">{{ c.message }}</p>
+
+                        <dl>
+                            {% for key, value in c.details.items() %}
+
+                                {% if value is not none and value != '' and value != [] %}
+
+                                    <dt>{{ key.replace('_', ' ')|title }}</dt>
+
+                                    <dd>
+                                        {% if value is mapping %}
+                                            {% for k, v in value.items() %}
+                                                {{ k }}: {{ v }}<br>
+                                            {% endfor %}
+                                        {% elif value is iterable and value is not string %}
+                                            {{ value|join(', ') }}
+                                        {% else %}
+                                            {{ value }}
+                                        {% endif %}
+                                    </dd>
+
+                                {% endif %}
+
+                            {% endfor %}
+                        </dl>
+
+                    </article>
+
+                {% endfor %}
+
+            </section>
+
+        {% endif %}
+
+    </main>
+
+    <footer class="footer">
+        ConnectCheck &middot; Safe, non-intrusive diagnostics only
+    </footer>
+
+    <script>
+        document.getElementById("diagnose-form").addEventListener("submit", function () {
+            var button = document.getElementById("submit-btn");
+            button.disabled = true;
+            button.textContent = "Running checks...";
+        });
+    </script>
+
+</body>
+</html>
