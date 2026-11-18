@@ -1,0 +1,463 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PCAP Analysis | ConnectCheck</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .pcap-container {
+            max-width: 1100px;
+            margin: 35px auto;
+            padding: 0 20px;
+        }
+
+        .pcap-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.07);
+        }
+
+        .upload-form {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .upload-form input {
+            flex: 1;
+            min-width: 220px;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+        }
+
+        .upload-form button,
+        .download-button {
+            background: #2563eb;
+            color: white;
+            padding: 12px 22px;
+            border: 0;
+            border-radius: 7px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+        }
+
+        .upload-form button:hover,
+        .download-button:hover {
+            background: #1d4ed8;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+        }
+
+        .metric {
+            background: #f1f5f9;
+            padding: 17px;
+            border-radius: 9px;
+        }
+
+        .metric strong {
+            display: block;
+            font-size: 1.5rem;
+            margin-top: 5px;
+        }
+
+        .section-title {
+            margin-bottom: 16px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            overflow-wrap: anywhere;
+        }
+
+        .data-table th {
+            background: #f1f5f9;
+        }
+
+        .finding {
+            padding: 14px;
+            border-left: 4px solid #eab308;
+            background: #fffbeb;
+            margin-bottom: 12px;
+            border-radius: 5px;
+        }
+
+        .finding.info {
+            border-left-color: #2563eb;
+            background: #eff6ff;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        @media(max-width:650px) {
+            .data-table {
+                font-size: .82rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="topbar">
+    <div class="container">
+        <h1>ConnectCheck</h1>
+        <p>Network Diagnostics and Packet Analysis Tool</p>
+
+        <nav style="margin-top:15px;">
+            <a href="{{ url_for('index') }}"
+               style="color:white; margin-right:20px;">
+                Network Diagnostics
+            </a>
+
+            <a href="{{ url_for('analyzer') }}"
+               style="color:white;">
+                PCAP Analysis
+            </a>
+        </nav>
+    </div>
+</header>
+
+<main class="pcap-container">
+
+    <!-- PCAP UPLOAD -->
+    <div class="pcap-card">
+        <h2 class="section-title">PCAP Analyzer</h2>
+
+        <p class="muted">
+            Upload a packet capture to inspect DNS, TCP, HTTP and TLS traffic.
+        </p>
+
+        <form class="upload-form"
+              method="POST"
+              action="{{ url_for('analyzer') }}"
+              enctype="multipart/form-data">
+
+            <input type="file"
+                   name="pcap_file"
+                   accept=".pcap,.pcapng"
+                   required>
+
+            <button type="submit">Analyze Capture</button>
+        </form>
+
+        <p class="muted" style="margin-top:12px">
+            Supported formats: PCAP and PCAPNG.
+            Maximum size: {{ max_mb }} MB.
+        </p>
+    </div>
+
+    <!-- ERROR MESSAGE -->
+    {% if error %}
+        <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+
+    {% set summary = result.summary %}
+    {% set protocols = result.protocol_statistics %}
+    {% set dns = result.dns_analysis %}
+    {% set tcp = result.tcp_analysis %}
+    {% set http = result.http_analysis %}
+    {% set tls = result.tls_analysis %}
+
+    <!-- ANALYSIS SUMMARY -->
+    <div class="pcap-card">
+        <h2>Analysis Summary</h2>
+
+        <p class="muted">
+            File: {{ result.filename }}
+        </p>
+
+        <div class="metric-grid" style="margin-top:20px">
+
+            <div class="metric">
+                Total Packets
+                <strong>{{ summary.total_packets }}</strong>
+            </div>
+
+            <div class="metric">
+                Total Bytes
+                <strong>{{ summary.total_bytes }}</strong>
+            </div>
+
+            <div class="metric">
+                Unique Source IPs
+                <strong>{{ summary.unique_source_ips }}</strong>
+            </div>
+
+            <div class="metric">
+                Unique Destination IPs
+                <strong>{{ summary.unique_destination_ips }}</strong>
+            </div>
+
+            <div class="metric">
+                Duration
+                <strong>{{ summary.duration_seconds }}s</strong>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PCAP PDF DOWNLOAD -->
+    {% if pcap_report_url %}
+    <div class="pcap-card">
+        <h2>Download PCAP Analysis Report</h2>
+
+        <p class="muted">
+            Download a PDF containing packet statistics,
+            DNS, TCP, HTTP, TLS analysis and network findings.
+        </p>
+
+        <a class="download-button"
+           href="{{ pcap_report_url }}">
+            Download PCAP PDF Report
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- PROTOCOL STATISTICS -->
+    <div class="pcap-card">
+        <h2 class="section-title">Protocol Statistics</h2>
+
+        <table class="data-table">
+            <tr>
+                <th>Protocol</th>
+                <th>Packets</th>
+            </tr>
+
+            {% for protocol, count in protocols.distribution.items() %}
+            <tr>
+                <td>{{ protocol }}</td>
+                <td>{{ count }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- DNS ANALYSIS -->
+    <div class="pcap-card">
+        <h2 class="section-title">DNS Analysis</h2>
+
+        <p>Queries: <strong>{{ dns.query_count }}</strong></p>
+        <p>Responses: <strong>{{ dns.response_count }}</strong></p>
+        <p>Unanswered queries: <strong>{{ dns.unanswered_count }}</strong></p>
+
+        <h3 style="margin-top:15px">DNS Queries</h3>
+
+        <table class="data-table">
+            <tr>
+                <th>Domain</th>
+                <th>Type</th>
+                <th>Count</th>
+            </tr>
+
+            {% for item in dns.queries %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.type }}</td>
+                <td>{{ item.count }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- TCP ANALYSIS -->
+    <div class="pcap-card">
+        <h2 class="section-title">TCP Analysis</h2>
+
+        <div class="metric-grid">
+
+            <div class="metric">
+                TCP Packets
+                <strong>{{ tcp.tcp_packets }}</strong>
+            </div>
+
+            <div class="metric">
+                SYN Packets
+                <strong>{{ tcp.syn_packets }}</strong>
+            </div>
+
+            <div class="metric">
+                SYN-ACK Packets
+                <strong>{{ tcp.synack_packets }}</strong>
+            </div>
+
+            <div class="metric">
+                RST Packets
+                <strong>{{ tcp.rst_packets }}</strong>
+            </div>
+
+            <div class="metric">
+                Connection Attempts
+                <strong>{{ tcp.connection_attempts }}</strong>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- HTTP ANALYSIS -->
+    <div class="pcap-card">
+        <h2 class="section-title">HTTP Analysis</h2>
+
+        <p>Requests: <strong>{{ http.request_count }}</strong></p>
+
+        <h3 style="margin-top:15px">HTTP Responses</h3>
+
+        <table class="data-table">
+            <tr>
+                <th>Status</th>
+                <th>Reason</th>
+                <th>Count</th>
+            </tr>
+
+            {% for item in http.responses %}
+            <tr>
+                <td>{{ item.status }}</td>
+                <td>{{ item.reason }}</td>
+                <td>{{ item.count }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- TLS ANALYSIS -->
+    <div class="pcap-card">
+        <h2 class="section-title">TLS Analysis</h2>
+
+        <p>
+            Handshake packets:
+            <strong>{{ tls.handshake_packets }}</strong>
+        </p>
+
+        <p>
+            ClientHello:
+            <strong>{{ tls.client_hello_count }}</strong>
+        </p>
+
+        <p>
+            ServerHello:
+            <strong>{{ tls.server_hello_count }}</strong>
+        </p>
+
+        <h3 style="margin-top:15px">ClientHello Details</h3>
+
+        {% for item in tls.client_hellos %}
+        <p>
+            SNI: {{ item.sni or "Not available" }} |
+            Version: {{ item.version }}
+        </p>
+        {% endfor %}
+    </div>
+
+    <!-- NETWORK FINDINGS -->
+    <div class="pcap-card">
+        <h2 class="section-title">Network Findings</h2>
+
+        {% for item in result.findings %}
+
+        <div class="finding {% if item.severity == 'info' %}info{% endif %}">
+
+            <strong>{{ item.severity | upper }}</strong>
+
+            <p>{{ item.observation }}</p>
+            <p>{{ item.evidence }}</p>
+
+            <p>
+                <strong>Possible explanation:</strong>
+                {{ item.possible_explanation }}
+            </p>
+
+            <p>
+                <strong>Recommendation:</strong>
+                {{ item.recommendation }}
+            </p>
+
+        </div>
+
+        {% else %}
+            <p>No notable findings were detected.</p>
+        {% endfor %}
+    </div>
+
+    <!-- PACKET SAMPLES -->
+    <div class="pcap-card">
+        <h2 class="section-title">Packet Samples</h2>
+
+        <div style="overflow-x:auto">
+            <table class="data-table">
+
+                <tr>
+                    <th>No.</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Protocol</th>
+                    <th>Source Port</th>
+                    <th>Destination Port</th>
+                    <th>Flags</th>
+                </tr>
+
+                {% for packet in result.packet_sample %}
+                <tr>
+                    <td>{{ packet.no }}</td>
+                    <td>{{ packet.src }}</td>
+                    <td>{{ packet.dst }}</td>
+                    <td>{{ packet.proto }}</td>
+                    <td>{{ packet.sport }}</td>
+                    <td>{{ packet.dport }}</td>
+                    <td>{{ packet.flags }}</td>
+                </tr>
+                {% endfor %}
+
+            </table>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <a class="back-link" href="{{ url_for('index') }}">
+        ← Back to Network Diagnostics
+    </a>
+
+</main>
+
+</body>
+</html>

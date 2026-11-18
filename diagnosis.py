@@ -1,4 +1,3 @@
-
 def _build(status, category, cause, summary, findings, recommendations):
     return {
         "status": status,          # healthy | warning | critical
