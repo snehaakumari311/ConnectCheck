@@ -9,143 +9,177 @@
 </head>
 
 <body>
+<header class="topbar">
+    <div class="container">
+        <h1>ConnectCheck</h1>
+        <p>Network Diagnostics and Packet Analysis Tool</p>
 
-    <header class="topbar">
-        <div class="container">
-            <h1>ConnectCheck</h1>
-            <p>Network Diagnostics and Packet Analysis Tool</p>
+        <nav style="margin-top: 15px;">
+            <a href="{{ url_for('index') }}"
+               style="color: white; margin-right: 20px;">
+                Network Diagnostics
+            </a>
+
+            <a href="{{ url_for('analyzer') }}"
+               style="color: white;">
+                PCAP Analysis
+            </a>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+
+    <form method="POST" class="search-card" id="diagnose-form">
+        <label for="domain">Enter a domain to diagnose</label>
+
+        <div class="search-row">
+            <input
+                type="text"
+                id="domain"
+                name="domain"
+                placeholder="example.com"
+                value="{{ domain_value }}"
+                required
+                autocomplete="off"
+            >
+
+            <button type="submit" id="submit-btn">Diagnose</button>
         </div>
-    </header>
 
-    <main class="container">
+        <small>Only test domains you are authorized to check.</small>
+    </form>
 
-        <form method="POST" class="search-card" id="diagnose-form">
-            <label for="domain">Enter a domain to diagnose</label>
+    {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
 
-            <div class="search-row">
-                <input
-                    type="text"
-                    id="domain"
-                    name="domain"
-                    placeholder="example.com"
-                    value="{{ domain_value }}"
-                    required
-                    autocomplete="off"
-                >
+    {% if data %}
 
-                <button type="submit" id="submit-btn">Diagnose</button>
+        {% set dg = data.diagnosis %}
+
+        <section class="diagnosis sev-{{ dg.status }}">
+            <div class="diag-head">
+                <h2>Diagnosis for {{ data.domain }}</h2>
+
+                <span class="badge badge-{{ dg.status }}">
+                    {{ dg.status|upper }}
+                </span>
             </div>
 
-            <small>Only test domains you are authorized to check.</small>
-        </form>
+            <p><strong>Category:</strong> {{ dg.category }}</p>
 
-        {% if error %}
-            <div class="alert alert-error">{{ error }}</div>
-        {% endif %}
+            <p class="cause">
+                <strong>Probable cause:</strong>
+                {{ dg.probable_cause }}
+            </p>
 
-        {% if data %}
+            <p class="summary">{{ dg.summary }}</p>
 
-            {% set dg = data.diagnosis %}
-
-            <section class="diagnosis sev-{{ dg.status }}">
-                <div class="diag-head">
-                    <h2>Diagnosis for {{ data.domain }}</h2>
-                    <span class="badge badge-{{ dg.status }}">
-                        {{ dg.status|upper }}
-                    </span>
+            <div class="diag-cols">
+                <div>
+                    <h3>Findings</h3>
+                    <ul>
+                        {% for finding in dg.findings %}
+                            <li>{{ finding }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
 
-                <p><strong>Category:</strong> {{ dg.category }}</p>
-
-                <p class="cause">
-                    <strong>Probable cause:</strong>
-                    {{ dg.probable_cause }}
-                </p>
-
-                <p class="summary">{{ dg.summary }}</p>
-
-                <div class="diag-cols">
-                    <div>
-                        <h3>Findings</h3>
-                        <ul>
-                            {% for finding in dg.findings %}
-                                <li>{{ finding }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h3>Recommendations</h3>
-                        <ul>
-                            {% for recommendation in dg.recommendations %}
-                                <li>{{ recommendation }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+                <div>
+                    <h3>Recommendations</h3>
+                    <ul>
+                        {% for recommendation in dg.recommendations %}
+                            <li>{{ recommendation }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <section class="grid">
+        <!-- NEW: PDF REPORT DOWNLOAD -->
+        <section class="search-card" style="margin-top: 20px;">
+            <h3>Download Diagnostic Report</h3>
 
-                {% for c in data.checks %}
+            <p>
+                Download a PDF containing the diagnostic results,
+                probable root cause, findings and recommendations.
+            </p>
 
-                    <article class="card {{ 'pass' if c.success else 'fail' }}">
+            <form method="POST" action="{{ url_for('download_report') }}">
+                <input
+                    type="hidden"
+                    name="domain"
+                    value="{{ data.domain }}"
+                >
 
-                        <div class="card-head">
-                            <h3>{{ c.check }}</h3>
+                <button type="submit">
+                    Download PDF Report
+                </button>
+            </form>
+        </section>
 
-                            <span class="status">
-                                {{ 'PASS' if c.success else 'FAIL' }}
-                            </span>
-                        </div>
+        <section class="grid">
 
-                        <p class="msg">{{ c.message }}</p>
+            {% for c in data.checks %}
 
-                        <dl>
-                            {% for key, value in c.details.items() %}
+                <article class="card {{ 'pass' if c.success else 'fail' }}">
 
-                                {% if value is not none and value != '' and value != [] %}
+                    <div class="card-head">
+                        <h3>{{ c.check }}</h3>
 
-                                    <dt>{{ key.replace('_', ' ')|title }}</dt>
+                        <span class="status">
+                            {{ 'PASS' if c.success else 'FAIL' }}
+                        </span>
+                    </div>
 
-                                    <dd>
-                                        {% if value is mapping %}
-                                            {% for k, v in value.items() %}
-                                                {{ k }}: {{ v }}<br>
-                                            {% endfor %}
-                                        {% elif value is iterable and value is not string %}
-                                            {{ value|join(', ') }}
-                                        {% else %}
-                                            {{ value }}
-                                        {% endif %}
-                                    </dd>
+                    <p class="msg">{{ c.message }}</p>
 
-                                {% endif %}
+                    <dl>
+                        {% for key, value in c.details.items() %}
 
-                            {% endfor %}
-                        </dl>
+                            {% if value is not none and value != '' and value != [] %}
 
-                    </article>
+                                <dt>{{ key.replace('_', ' ')|title }}</dt>
 
-                {% endfor %}
+                                <dd>
+                                    {% if value is mapping %}
+                                        {% for k, v in value.items() %}
+                                            {{ k }}: {{ v }}<br>
+                                        {% endfor %}
+                                    {% elif value is iterable and value is not string %}
+                                        {{ value|join(', ') }}
+                                    {% else %}
+                                        {{ value }}
+                                    {% endif %}
+                                </dd>
 
-            </section>
+                            {% endif %}
 
-        {% endif %}
+                        {% endfor %}
+                    </dl>
 
-    </main>
+                </article>
 
-    <footer class="footer">
-        ConnectCheck &middot; Safe, non-intrusive diagnostics only
-    </footer>
+            {% endfor %}
 
-    <script>
-        document.getElementById("diagnose-form").addEventListener("submit", function () {
-            var button = document.getElementById("submit-btn");
-            button.disabled = true;
-            button.textContent = "Running checks...";
-        });
-    </script>
+        </section>
+
+    {% endif %}
+
+</main>
+
+<footer class="footer">
+    ConnectCheck &middot; Safe, non-intrusive diagnostics only
+</footer>
+
+<script>
+    document.getElementById("diagnose-form").addEventListener("submit", function () {
+        var button = document.getElementById("submit-btn");
+        button.disabled = true;
+        button.textContent = "Running checks...";
+    });
+</script>
 
 </body>
 </html>
